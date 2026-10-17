@@ -91,3 +91,13 @@ Significant decisions are recorded here with their status. Proposed decisions ar
 - **Reasoning:** Saving the complete pipeline preserves the fitted one-hot encoder and its categories alongside the fitted classifier. Joblib is already available through the installed Python environment; no dependency was installed. A local ignored artifact supports reproducible testing without committing generated model data.
 - **Consequences:** Inference requires the six documented input features and compatible scikit-learn/joblib versions. Joblib files use Python serialization and must be loaded only from trusted sources. The artifact supports synthetic-dataset classification only and does not establish early-warning utility.
 - **Validation:** Artifact was generated from `X_train`/`y_train` only; preprocessing and classifier are both present in the saved pipeline. Tests verify input validation, artifact loading, and identical pre-save/post-load probabilities. The reserved test set was not reevaluated.
+
+## D-010: Serve predictions through a thin FastAPI layer
+
+- **Status:** Accepted and implemented; runtime tests pass.
+- **Context:** The persisted pipeline and single-record inference function are established; callers need a local HTTP interface.
+- **Decision:** Add FastAPI endpoints for health, model metadata, and one-record predictions. Load the ignored pipeline once during application lifespan, validate request shape and values with Pydantic, and delegate prediction to `inference.predict_record`.
+- **Alternatives considered:** Reload the artifact on each request; duplicate feature preprocessing or classification in the API; fail application startup when the artifact is absent.
+- **Reasoning:** One lifespan load avoids repeated disk reads; existing inference remains the source of truth. Keeping the app alive without an artifact allows health diagnostics while returning HTTP 503 for prediction.
+- **Consequences:** The API process needs a locally generated trusted artifact and compatible Python/scikit-learn/joblib versions. This endpoint classifies synthetic-dataset records and is not a real-world early-warning service. `requirements.txt` now records notebook, ML, API, server, and HTTP test-client dependencies because no dependency manifest previously existed.
+- **Validation:** API tests cover valid inference, one-time loading, request validation, health/model-info, and missing-artifact behavior. No test-set evaluation or model selection was performed in this milestone.
