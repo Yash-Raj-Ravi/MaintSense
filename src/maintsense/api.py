@@ -90,6 +90,10 @@ def create_app(
             for origin in os.getenv("MAINTSENSE_CORS_ORIGINS", "").split(",")
             if origin.strip()
         ]
+    if "*" in cors_origins:
+        raise ValueError(
+            "CORS origins must be explicitly listed; wildcard origins are not allowed."
+        )
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -138,6 +142,16 @@ def create_app(
             "status": "ok" if available else "degraded",
             "model_available": available,
         }
+
+    @app.get("/ready")
+    def ready(request: Request) -> dict[str, str | bool]:
+        """Return success only when the inference artifact is loaded."""
+        if not isinstance(request.app.state.pipeline, Pipeline):
+            raise HTTPException(
+                status_code=503,
+                detail="Prediction service is not ready.",
+            )
+        return {"status": "ready", "model_available": True}
 
     @app.get("/model-info")
     def model_info(request: Request) -> dict[str, object]:

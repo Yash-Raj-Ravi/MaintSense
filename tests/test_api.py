@@ -62,6 +62,14 @@ class PredictionApiTests(unittest.TestCase):
             response.json(), {"status": "ok", "model_available": True}
         )
 
+    def test_ready_reports_loaded_model(self):
+        response = self.client.get("/ready")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(), {"status": "ready", "model_available": True}
+        )
+
     def test_model_info_describes_frozen_inference_contract(self):
         response = self.client.get("/model-info")
         payload = response.json()
@@ -159,6 +167,10 @@ class PredictionApiTests(unittest.TestCase):
             response.headers["access-control-allow-origin"], "https://ui.example"
         )
 
+    def test_wildcard_cors_origin_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "wildcard origins are not allowed"):
+            create_app(self.artifact_path, cors_origins=["*"])
+
 
 class MissingArtifactApiTests(unittest.TestCase):
     def test_missing_artifact_is_visible_and_prediction_returns_503(self):
@@ -170,6 +182,14 @@ class MissingArtifactApiTests(unittest.TestCase):
                 self.assertEqual(
                     health.json(), {"status": "degraded", "model_available": False}
                 )
+                readiness = client.get("/ready")
+                self.assertEqual(readiness.status_code, 503)
+                self.assertEqual(
+                    readiness.json(),
+                    {"detail": "Prediction service is not ready."},
+                )
+                self.assertNotIn(str(absent_artifact), readiness.text)
+                self.assertNotIn("Traceback", readiness.text)
                 self.assertFalse(client.get("/model-info").json()["model_available"])
 
                 prediction = client.post("/predict", json=VALID_REQUEST)

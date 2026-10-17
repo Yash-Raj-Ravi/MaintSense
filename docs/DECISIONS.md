@@ -110,4 +110,44 @@ Significant decisions are recorded here with their status. Proposed decisions ar
 - **Alternatives considered:** Hardcode a backend URL into components; duplicate model scoring in JavaScript; add a frontend server or database; allow every origin for CORS.
 - **Reasoning:** A small typed HTTP client mirrors the Pydantic contract and keeps prediction logic in the backend. The Vite proxy provides same-origin local calls, while an explicit backend allow-list supports direct deployments without wildcard CORS.
 - **Consequences:** The browser requires the API and local model artifact to be available. Vite `VITE_*` values are public build-time configuration and must not contain secrets. Evaluation metrics are displayed from ML-004 documentation and are not recomputed by the client.
-- **Validation:** Six Vitest tests pass; ESLint and the TypeScript/Vite production build pass. The full Python suite passes 25 tests, including exact-origin CORS preflight coverage. No AI4I test-set evaluation or model/threshold changes were made for this milestone.
+- **Validation:** The current frontend suite contains 10 Vitest tests; ESLint and the TypeScript/Vite production build passed during the frontend milestone. The full Python suite then passed 25 tests, including exact-origin CORS preflight coverage. No AI4I test-set evaluation or model/threshold changes were made for that milestone.
+
+## D-012: Provision the official AI4I dataset with an observed checksum
+
+- **Status:** Accepted; checksum validated against an official UCI download.
+- **Context:** The raw dataset is ignored by Git, so a fresh checkout needs a reproducible way to obtain the exact data used by the established workflow.
+- **Decision:** Download UCI dataset 601's official ZIP to the fixed `data/raw/ai4i+2020+predictive+maintenance+dataset/ai4i2020.csv` location. Validate the extracted CSV with SHA-256 `dc6630cd9b1f0f853922fad78a1b6436570d3f1ec863f1dd5c4340ac56bc8a8e`, the expected official columns, and 10,000 data rows. Refuse to overwrite an existing destination.
+- **Alternatives considered:** Commit the CSV, pin only a URL, trust an unverified local copy, or use a third-party mirror.
+- **Reasoning:** A pinned digest detects changed, truncated, or invalid downloads and preserves the original dataset outside Git.
+- **Consequences:** Initial provisioning needs network access to UCI; later runs validate the local CSV without downloading. The checksum is for the extracted CSV, not the ZIP container.
+- **Validation:** Downloaded the official archive on 2026-10-17 from `https://archive.ics.uci.edu/static/public/601/ai4i%2B2020%2Bpredictive%2Bmaintenance%2Bdataset.zip`, extracted `ai4i2020.csv`, and computed SHA-256 with PowerShell `Get-FileHash`. The official download and existing local CSV both measured 522,048 bytes and had the same digest. UCI dataset page: https://archive.ics.uci.edu/dataset/601/ai4i+2020+predictive+maintenance+dataset (DOI 10.24432/C5HS5C).
+
+## D-013: Separate API liveness from prediction readiness
+
+- **Status:** Accepted; implementation and API tests added, final validation pending.
+- **Context:** The process should remain inspectable when its local artifact is missing, while an orchestrator needs a signal that prediction can run.
+- **Decision:** Preserve `/health` as an HTTP 200 liveness/diagnostic endpoint and add `/ready`, returning HTTP 200 only when the application lifespan loaded a scikit-learn pipeline and HTTP 503 otherwise.
+- **Alternatives considered:** Make `/health` fail when the model is unavailable; use `/predict` as a readiness probe; return success readiness unconditionally.
+- **Reasoning:** Separating process liveness from prediction capability keeps diagnostics available while correctly withholding readiness.
+- **Consequences:** Deployment health checks use `/ready`; `/health` still reports model availability. Responses do not reveal artifact paths or exception details.
+- **Validation:** Healthy and missing-artifact API tests pass in the full 34-test Python suite. Wildcard CORS configuration is rejected by a regression test. No model evaluation was performed.
+
+## D-014: Build separate API and reverse-proxied frontend containers
+
+- **Status:** Accepted; configuration and container image builds validated; live runtime smoke test pending.
+- **Context:** The API requires a generated joblib artifact, while the production frontend should call a same-origin API path.
+- **Decision:** Build an API image that copies and validates the pre-generated `models/random_forest.joblib`; build the frontend with `VITE_API_BASE_URL=/api` and serve static files with Nginx. Nginx forwards `/api/*` to FastAPI while stripping the prefix. Compose waits for API readiness before starting the frontend.
+- **Alternatives considered:** Train or download at API startup; expose separate public origins and require CORS; use Vite preview in production; combine Node build tools with the Python runtime image.
+- **Reasoning:** Missing artifacts fail early during image build, runtime performs no training or network data access, and same-origin routing avoids permissive CORS.
+- **Consequences:** Provision data and generate the artifact before Docker builds. The Vite value is compiled into browser assets, so changing it requires rebuilding the frontend image. Direct cross-origin deployment must configure exact trusted origins.
+- **Validation:** `docker compose config` and both Docker image builds passed in the prior deployment check. The Docker Engine is unavailable in the current review environment, so live container startup and end-to-end reverse-proxy checks remain pending. No model evaluation was performed.
+
+## D-015: Separate pinned runtime and development dependencies
+
+- **Status:** Accepted; pins captured from the installed Python 3.13.1 environment; development test-runner availability validated.
+- **Context:** The prior manifest mixed broad API, ML, notebook, and testing ranges, allowing training/serving dependency drift.
+- **Decision:** Put pinned API/inference packages in `requirements-runtime.txt`; layer notebook and test packages, including `pytest==9.1.1`, in `requirements-dev.txt`; keep `requirements.txt` as a backward-compatible full-development entry point; use `requirements.lock` as a constraints snapshot from the installed environment.
+- **Alternatives considered:** Continue broad ranges; add a lock-generation tool; use a platform-specific package manager.
+- **Reasoning:** This gives production a smaller install and constrains transitive resolution without adding a dependency-generation tool.
+- **Consequences:** Upgrades require regenerating and reviewing pins. The constraints snapshot includes environment packages beyond the runtime set and platform-specific entries; only requested dependencies are installed.
+- **Validation:** Pins were captured from `.venv`; the development requirements installed successfully, `python -m pytest --version` reported 9.1.1, `pip check` passed, and the complete Python suite passed (34 tests). Pip reports a pre-existing invalid `~ip` distribution warning in the local virtual environment. Runtime container dependency installation was validated during the prior successful image builds; the Docker Engine is unavailable in the current review environment.
