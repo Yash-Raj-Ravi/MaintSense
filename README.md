@@ -28,7 +28,8 @@ results are not a validated real-world early-warning system.
 ## Project Status
 
 Exploration, traditional model comparison, validation-based selection,
-and one final test evaluation are complete for the synthetic dataset. See
+one final test evaluation, and local single-record inference are complete
+for the synthetic dataset. See
 [project status](docs/PROJECT_STATUS.md) for the current milestone.
 
 ## Project Documentation

@@ -10,10 +10,11 @@ Last updated: 2026-10-17
 - The exploration notebook executed successfully with the project `.venv`; observed results are recorded in `EXPERIMENT_LOG.md`.
 - Reproducible baseline implemented in `src/maintsense/baseline.py`; four unit tests pass.
 - Dummy, two Logistic Regression variants, Random Forest, and Gradient Boosting evaluated on validation data. Results are recorded in `EXPERIMENT_LOG.md`.
-- Validation threshold analysis and precision-recall plot completed for Random Forest and Gradient Boosting; no operating threshold selected.
+- Validation threshold analysis and precision-recall plot completed for Random Forest and Gradient Boosting. Random Forest at 0.40 is frozen for this offline inference milestone; no production operating threshold has been recommended.
 - Validation-based selection rule frozen; Random Forest at threshold 0.40 selected for one final test evaluation.
 - Frozen Random Forest configuration evaluated once on the reserved test partition; metrics are recorded in `EXPERIMENT_LOG.md`.
-- Ten unit tests pass, including model-comparison, threshold, and selection/evaluation coverage.
+- Training-only Random Forest pipeline artifact and single-record inference module implemented; generated artifact remains ignored by Git.
+- Fifteen unit tests pass, including model-comparison, threshold, selection/evaluation, and inference coverage.
 - Project documentation system established and linked from the README.
 
 ## In progress
