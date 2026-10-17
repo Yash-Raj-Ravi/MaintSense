@@ -15,16 +15,25 @@ Official UCI AI4I ZIP
   -> inference.py -> api.py (/predict delegates to existing inference)
   -> frontend React/Vite dashboard
 
-Production containers:
+Supplied production deployment:
+  Browser -> Vercel frontend (https://maint-sense.vercel.app)
+       -> Render FastAPI backend (https://maintsense-api.onrender.com)
+            -> python -m maintsense.server (PORT)
+            -> loaded joblib Pipeline (artifact source unverified)
+
+Documented Docker API image build path (use by live service unverified):
   versioned GitHub Release asset (existing model; not in Git)
        -> Docker build downloads and verifies pinned SHA-256
        -> /app/models/random_forest.joblib (inside API image)
-  Render backend Docker Web Service: python -m maintsense.server (PORT)
-       -> loaded joblib Pipeline
-  Render frontend Static Site: VITE_API_BASE_URL points to backend origin
-       -> FastAPI CORS allows only the configured static-site origin
 
-Local Docker Compose remains available:
+For direct cross-origin deployment, set `VITE_API_BASE_URL` to the backend
+origin and configure `MAINTSENSE_CORS_ORIGINS` on the backend to allow the
+exact frontend origin. These are required settings for the Vercel-to-Render
+topology; the supplied URLs do not verify the current environment values,
+endpoint health, deployed revisions, or model artifact provenance.
+
+Local development and Docker Compose remain separate paths:
+  Vite dev server -> optional `/api` proxy -> local FastAPI backend
   frontend image: Vite build with VITE_API_BASE_URL=/api
        -> Nginx serves SPA and strips /api from proxied requests
        -> API image uses the same verified release asset
@@ -37,10 +46,11 @@ the request then calls `inference.predict_record`. The API never trains or
 downloads data during startup. It loads the artifact once per app lifespan.
 
 The frontend development proxy remains configured in `frontend/vite.config.ts`
-through `MAINTSENSE_API_PROXY_TARGET`. Production uses
-`frontend/nginx.conf`: same-origin `/api/*` requests are forwarded to FastAPI
-with the `/api` prefix removed. CORS is disabled unless exact trusted origins
-are provided with `MAINTSENSE_CORS_ORIGINS`.
+through `MAINTSENSE_API_PROXY_TARGET`. The Docker Compose frontend uses
+`frontend/nginx.conf` to forward same-origin `/api/*` requests to FastAPI while
+removing the `/api` prefix. In the supplied Vercel-to-Render deployment, the
+browser calls the API origin directly; exact CORS configuration in the hosting
+environment has not been verified.
 
 ## ML and data scope
 
@@ -74,10 +84,12 @@ probability calibration, operating costs, and external validation are open.
 - `.dockerignore` and `frontend/.dockerignore`: omit local data, environments,
   dependencies, and generated build output from image contexts.
 
-For Render, deploy the backend Dockerfile as one Web Service and the React
-build as a separate Static Site. Configure the backend's artifact URL and
-exact frontend origin, and set the frontend's API base URL to the backend
-origin. The artifact is baked into the image, so the API does not depend on
-Render's ephemeral service filesystem after startup.
+The supplied production topology is a Render backend Docker Web Service and a
+Vercel static frontend. The repository also supports a separate frontend
+container and Nginx `/api` reverse proxy for Docker Compose; that proxy is not
+the Vercel production request path. The artifact is baked into a built API
+image, so that image does not depend on Render's ephemeral service filesystem
+after startup. Whether the deployed Render image was built by this workflow is
+not verified by repository contents.
 
 Update this file when the implemented data flow or service topology changes.

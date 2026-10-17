@@ -19,6 +19,17 @@ See [project status](docs/PROJECT_STATUS.md), [decisions](docs/DECISIONS.md),
 [experiment log](docs/EXPERIMENT_LOG.md), and
 [architecture](docs/ARCHITECTURE.md) for current implementation details.
 
+## Current deployment
+
+- Frontend: [https://maint-sense.vercel.app](https://maint-sense.vercel.app)
+- FastAPI backend: [https://maintsense-api.onrender.com](https://maintsense-api.onrender.com)
+
+The supplied production topology is a Vercel frontend calling a Render API;
+the frontend is not currently described as a Render Static Site. These URLs
+record the supplied deployment facts only. Live endpoint health, deployed
+build revisions, and hosting-dashboard settings have not been independently
+verified here.
+
 ## Fresh clone: prepare Python and the local artifact
 
 Use Python 3.13.1 for the pinned environment. The checked-in constraints were
@@ -85,7 +96,9 @@ The production process command is `python -m maintsense.server`. It binds to
 `0.0.0.0`, uses platform `PORT` when present (otherwise 8000), and does not
 enable reload. `MAINTSENSE_CORS_ORIGINS` is an optional comma-separated list
 of exact trusted origins. Leave it unset for the production same-origin
-reverse-proxy setup.
+reverse proxy used by local Docker Compose. Direct cross-origin deployments,
+including the supplied Vercel-to-Render topology, require the backend to allow
+the exact frontend origin.
 
 Example `POST /predict` request:
 
@@ -130,7 +143,7 @@ and forwards `/api/*` to the `api` service, stripping the prefix. Vite
 `VITE_*` variables are embedded in public browser assets; do not put secrets
 in them.
 
-## Publish the existing model artifact for deployment
+## Model artifact for Docker builds
 
 The model and dataset are not committed. Deployment does not need the raw
 dataset and must not retrain the classifier. The backend image downloads the
@@ -153,22 +166,26 @@ unchanged `models/random_forest.joblib` file, and publish the release. Do not
 regenerate or edit the model to create the asset. Copy the asset's HTTPS
 download URL; the build accepts only this repository's Release download URL
 and the pinned checksum prevents a different file from being used. No release
-or asset has been created by this project setup.
+or asset is created automatically by this repository. Whether a release asset
+has been published for or used by the supplied live backend is not established
+by repository contents.
 
-## Deploy on Render
+## Production deployment configuration
 
-Create two services from the same pushed repository:
+The supplied deployment uses a Render Docker Web Service for the backend and
+a Vercel static frontend. The following settings describe the expected
+configuration; the current hosting-dashboard values have not been inspected.
 
-1. **Backend Web Service:** select Docker, use the repository root as the
-   root directory and `Dockerfile` as the Dockerfile path. Set
-   `MODEL_ARTIFACT_URL` to the exact public GitHub Release asset URL copied
-   above. Set `MAINTSENSE_CORS_ORIGINS` to the exact HTTPS origin of the
-   frontend Static Site. Do not set it to `*`. Set the Render health check
-   path to `/ready`; Render supplies `PORT`, which the server honors.
-2. **Frontend Static Site:** set root directory to `frontend`, build command
-   to `npm ci && npm run build`, and publish directory to `dist`. Set
-   `VITE_API_BASE_URL` to the backend's public HTTPS origin. This is public
-   browser configuration, not a secret.
+For the backend, use the repository root and `Dockerfile` for the Render
+Docker Web Service. Provide `MODEL_ARTIFACT_URL` as the public Release asset
+URL, set `MAINTSENSE_CORS_ORIGINS` to the exact Vercel frontend origin (not
+`*`), and configure `/ready` as the Render health check path. Render supplies
+`PORT`, which the server honors.
+
+For the Vercel frontend, use the `frontend/` Vite app, build with
+`npm ci && npm run build`, and publish `dist/`. Set `VITE_API_BASE_URL` to
+`https://maintsense-api.onrender.com` at build time. This value is public
+browser configuration, not a secret.
 
 The release asset must be publicly downloadable because the Docker build
 fetches it without credentials. The SHA-256 is pinned in
@@ -178,9 +195,9 @@ or checksum mismatch stops the build. The verified artifact is placed at
 validation loads it. The dataset is not part of the image, and Docker build
 or API startup does not train a model.
 
-After these source changes are pushed and the release asset is published, test
-the build from a clean clone (replace the placeholder with the URL copied from
-the actual release):
+To validate this Docker build path from a clean clone once these source changes
+and a matching public release asset are available, replace the placeholder
+with the URL copied from that release:
 
 ```powershell
 git clone https://github.com/Yash-Raj-Ravi/MaintSense.git MaintSense-clean-build
