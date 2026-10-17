@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+import logging
 from numbers import Real
 import os
 from pathlib import Path
@@ -22,6 +23,8 @@ from maintsense.inference import (
     predict_record,
 )
 from maintsense.model_artifact import ARTIFACT_PATH
+
+logger = logging.getLogger(__name__)
 
 SYNTHETIC_SCOPE = (
     "Machine-failure classification on the synthetic AI4I 2020 dataset; "
@@ -174,8 +177,14 @@ def create_app(
             )
         try:
             result = predict_record(payload.to_inference_record(), pipeline)
-        except (TypeError, ValueError) as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except Exception as exc:
+            # Estimator/runtime failures are server errors; keep implementation
+            # details and local paths out of the public response.
+            logger.exception("Prediction failed")
+            raise HTTPException(
+                status_code=500,
+                detail="Prediction failed due to an internal service error.",
+            ) from exc
         return {**result, "threshold": DECISION_THRESHOLD}
 
     return app

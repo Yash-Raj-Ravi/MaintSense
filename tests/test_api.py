@@ -103,6 +103,53 @@ class PredictionApiTests(unittest.TestCase):
         self.assertEqual(payload["predicted_class"], expected["predicted_class"])
         self.assertEqual(payload["threshold"], DECISION_THRESHOLD)
 
+    def test_all_valid_machine_categories_are_accepted(self):
+        for machine_type in ["H", "L", "M"]:
+            with self.subTest(machine_type=machine_type):
+                response = self.client.post(
+                    "/predict", json={**VALID_REQUEST, "Type": machine_type}
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertIn(response.json()["predicted_class"], [0, 1])
+
+    def test_prediction_estimator_error_returns_sanitized_internal_error(self):
+        for error in [
+            RuntimeError("secret path C:\\private\\model.joblib"),
+            ValueError("internal estimator detail"),
+            TypeError("internal estimator detail"),
+        ]:
+            with self.subTest(error_type=type(error).__name__):
+                with patch("maintsense.api.predict_record", side_effect=error):
+                    response = self.client.post("/predict", json=VALID_REQUEST)
+
+                self.assertEqual(response.status_code, 500)
+                self.assertEqual(
+                    response.json(),
+                    {"detail": "Prediction failed due to an internal service error."},
+                )
+                self.assertNotIn("private", response.text)
+                self.assertNotIn("internal estimator detail", response.text)
+                self.assertNotIn("Traceback", response.text)
+
+    def test_prediction_error_is_logged_without_logging_request_features(self):
+        with patch(
+            "maintsense.api.predict_record",
+            side_effect=RuntimeError("private estimator failure"),
+        ):
+            with self.assertLogs("maintsense.api", level="ERROR") as captured:
+                response = self.client.post("/predict", json=VALID_REQUEST)
+
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(
+            response.json(),
+            {"detail": "Prediction failed due to an internal service error."},
+        )
+        log_output = "\n".join(captured.output)
+        self.assertIn("Prediction failed", log_output)
+        self.assertIn("private estimator failure", log_output)
+        for feature_value in ["300.0", "310.0", "1500", "40.0", "120"]:
+            self.assertNotIn(feature_value, log_output)
+
     def test_missing_and_extra_fields_are_rejected(self):
         missing = dict(VALID_REQUEST)
         del missing["Torque [Nm]"]
@@ -198,6 +245,32 @@ class MissingArtifactApiTests(unittest.TestCase):
         self.assertIn("model is unavailable", prediction.json()["detail"])
         self.assertNotIn(str(absent_artifact), prediction.text)
         self.assertNotIn("Traceback", prediction.text)
+
+    def test_invalid_artifacts_keep_service_unready_and_prediction_unavailable(self):
+        from sklearn.ensemble import RandomForestClassifier
+        from sklearn.pipeline import Pipeline
+        import joblib
+
+        invalid_artifacts = []
+        with tempfile.TemporaryDirectory() as temp_dir:
+            corrupt_path = Path(temp_dir) / "corrupt.joblib"
+            corrupt_path.write_bytes(b"corrupt")
+            invalid_artifacts.append(corrupt_path)
+
+            unfitted_path = Path(temp_dir) / "unfitted.joblib"
+            joblib.dump(
+                Pipeline([("classifier", RandomForestClassifier())]), unfitted_path
+            )
+            invalid_artifacts.append(unfitted_path)
+
+            for artifact_path in invalid_artifacts:
+                with self.subTest(artifact=artifact_path.name):
+                    with TestClient(create_app(artifact_path)) as client:
+                        self.assertEqual(client.get("/ready").status_code, 503)
+                        prediction = client.post("/predict", json=VALID_REQUEST)
+                        self.assertEqual(prediction.status_code, 503)
+                        self.assertNotIn(str(artifact_path), prediction.text)
+                        self.assertNotIn("Traceback", prediction.text)
 
 
 if __name__ == "__main__":

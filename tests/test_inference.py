@@ -4,7 +4,9 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
+import joblib
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -58,6 +60,52 @@ class InferenceTests(unittest.TestCase):
             int(result["failure_probability"] >= DECISION_THRESHOLD),
         )
 
+    def test_probability_threshold_boundary(self):
+        for probability, expected_class in [
+            (DECISION_THRESHOLD - 1e-9, 0),
+            (DECISION_THRESHOLD, 1),
+            (DECISION_THRESHOLD + 1e-9, 1),
+        ]:
+            with self.subTest(probability=probability):
+                with patch.object(
+                    self.pipeline,
+                    "predict_proba",
+                    return_value=np.array([[1 - probability, probability]]),
+                ):
+                    result = predict_record(VALID_RECORD, self.pipeline)
+                self.assertEqual(result["failure_probability"], probability)
+                self.assertEqual(result["predicted_class"], expected_class)
+
+    def test_failure_probability_uses_class_one_column_when_classes_reordered(self):
+        classifier = self.pipeline.named_steps["classifier"]
+        classifier.classes_ = np.array([1, 0])
+        try:
+            with patch.object(
+                self.pipeline,
+                "predict_proba",
+                return_value=np.array([[0.73, 0.27]]),
+            ):
+                result = predict_record(VALID_RECORD, self.pipeline)
+        finally:
+            classifier.classes_ = np.array([0, 1])
+
+        self.assertEqual(result["failure_probability"], 0.73)
+        self.assertEqual(result["predicted_class"], 1)
+
+    def test_all_valid_machine_categories_are_accepted(self):
+        for machine_type in ["H", "L", "M"]:
+            with self.subTest(machine_type=machine_type):
+                result = predict_record(
+                    {**VALID_RECORD, "Type": machine_type}, self.pipeline
+                )
+                self.assertIn(result["predicted_class"], [0, 1])
+
+    def test_non_mapping_inputs_are_rejected(self):
+        for record in [None, [], [VALID_RECORD]]:
+            with self.subTest(record=record):
+                with self.assertRaisesRegex(TypeError, "record must be a mapping"):
+                    predict_record(record, self.pipeline)
+
     def test_missing_unexpected_and_forbidden_inputs_are_rejected(self):
         missing = dict(VALID_RECORD)
         del missing["Torque [Nm]"]
@@ -105,6 +153,23 @@ class InferenceTests(unittest.TestCase):
         missing_path = Path(self.temp_dir.name) / "absent.joblib"
         with self.assertRaisesRegex(FileNotFoundError, "run python -m maintsense.model_artifact"):
             load_pipeline_artifact(missing_path)
+
+    def test_corrupt_artifact_is_rejected(self):
+        corrupt_path = Path(self.temp_dir.name) / "corrupt.joblib"
+        corrupt_path.write_bytes(b"not a joblib artifact")
+
+        with self.assertRaisesRegex(ValueError, "Could not load model artifact"):
+            load_pipeline_artifact(corrupt_path)
+
+    def test_unfitted_pipeline_artifact_is_rejected(self):
+        from sklearn.ensemble import RandomForestClassifier
+        from sklearn.pipeline import Pipeline
+
+        invalid_path = Path(self.temp_dir.name) / "unfitted.joblib"
+        joblib.dump(Pipeline([("classifier", RandomForestClassifier())]), invalid_path)
+
+        with self.assertRaisesRegex(ValueError, "Pipeline is not fitted"):
+            load_pipeline_artifact(invalid_path)
 
 
 if __name__ == "__main__":
