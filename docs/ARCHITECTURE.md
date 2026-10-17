@@ -2,7 +2,7 @@
 
 ## Current state
 
-The project currently has a local synthetic AI4I CSV, an exploratory Jupyter notebook, reusable Python modeling modules, and a locally generated inference pipeline. The raw dataset and generated model artifact are ignored by Git. A validation-selected configuration has been evaluated once on the reserved test partition; no serving API, web client, or container deployment exists.
+The project has a local synthetic AI4I CSV, an exploratory notebook, reusable ML code, a locally generated inference pipeline, a FastAPI service, and a React/Vite dashboard. The raw dataset and generated model artifact are ignored by Git. A validation-selected configuration has been evaluated once on the reserved test partition; container deployment does not exist.
 
 ```text
                        +--> notebooks/01_data_exploration.ipynb
@@ -22,6 +22,7 @@ Local AI4I CSV --------+
        +--> src/maintsense/api.py (implemented FastAPI service)
             |-- GET /health and GET /model-info
             +-- POST /predict -> existing inference function
+                 +--> frontend/ React dashboard (Vite proxy or configured CORS)
 
 tests/            baseline, inference, and API unit tests
 models/           local ignored random_forest.joblib artifact
@@ -37,9 +38,17 @@ implement a second preprocessor or classifier. Missing artifacts leave the
 service available in degraded health state and cause predictions to return
 HTTP 503; malformed requests return HTTP 422.
 
-The local startup command and example request/response shape are documented
-in the README. The API is implemented, while React/Vite and Docker remain
-planned.
+The React/Vite/TypeScript client is implemented in `frontend/`. Its API client
+uses `VITE_API_BASE_URL` and calls the three existing routes without
+reimplementing inference. The development server can proxy `/api/*` to the
+backend with `MAINTSENSE_API_PROXY_TARGET`, avoiding CORS in local development.
+For direct cross-origin requests, the FastAPI app accepts a comma-separated
+`MAINTSENSE_CORS_ORIGINS` allow-list. The performance panel renders the
+documented ML-004 validation and one-time test metrics; these are static
+historical results, not results from a new browser prediction.
+
+The local startup commands and example requests are documented in the README.
+Docker deployment remains planned.
 
 ## Data and artifact flow
 

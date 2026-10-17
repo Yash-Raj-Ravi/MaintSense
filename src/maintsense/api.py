@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from numbers import Real
+import os
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -12,6 +13,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sklearn.pipeline import Pipeline
+from starlette.middleware.cors import CORSMiddleware
 
 from maintsense.baseline import FEATURES
 from maintsense.inference import (
@@ -75,8 +77,19 @@ class PredictionResponse(BaseModel):
     threshold: float
 
 
-def create_app(artifact_path: Path = ARTIFACT_PATH) -> FastAPI:
+def create_app(
+    artifact_path: Path = ARTIFACT_PATH,
+    *,
+    cors_origins: list[str] | None = None,
+) -> FastAPI:
     """Build an app that loads its artifact once during each lifespan."""
+
+    if cors_origins is None:
+        cors_origins = [
+            origin.strip()
+            for origin in os.getenv("MAINTSENSE_CORS_ORIGINS", "").split(",")
+            if origin.strip()
+        ]
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -97,6 +110,14 @@ def create_app(artifact_path: Path = ARTIFACT_PATH) -> FastAPI:
         version="0.1.0",
         lifespan=lifespan,
     )
+    if cors_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=cors_origins,
+            allow_credentials=False,
+            allow_methods=["GET", "POST"],
+            allow_headers=["Content-Type"],
+        )
 
     @app.exception_handler(RequestValidationError)
     async def request_validation_error(

@@ -142,6 +142,23 @@ class PredictionApiTests(unittest.TestCase):
 
             loader.assert_called_once_with(self.artifact_path)
 
+    def test_configured_cors_origin_allows_browser_preflight(self):
+        app = create_app(self.artifact_path, cors_origins=["https://ui.example"])
+        with TestClient(app) as client:
+            response = client.options(
+                "/predict",
+                headers={
+                    "Origin": "https://ui.example",
+                    "Access-Control-Request-Method": "POST",
+                    "Access-Control-Request-Headers": "content-type",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.headers["access-control-allow-origin"], "https://ui.example"
+        )
+
 
 class MissingArtifactApiTests(unittest.TestCase):
     def test_missing_artifact_is_visible_and_prediction_returns_503(self):

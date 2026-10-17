@@ -15,7 +15,8 @@ Last updated: 2026-10-17
 - Frozen Random Forest configuration evaluated once on the reserved test partition; metrics are recorded in `EXPERIMENT_LOG.md`.
 - Training-only Random Forest pipeline artifact and single-record inference module implemented; generated artifact remains ignored by Git.
 - FastAPI prediction backend implemented with `/health`, `/model-info`, and `/predict`; it reuses the inference module and loads the artifact once during application lifespan.
-- Full suite passes 24 tests, including API prediction, request validation, model metadata, health, cached artifact initialization, and missing-artifact coverage.
+- React/Vite/TypeScript industrial analytics dashboard implemented with API connectivity, machine assessment, prediction results, documented validation/test metrics, and synthetic-data limitations.
+- Frontend tests (6), ESLint, production build, and full Python test suite (25) pass.
 - Project documentation system established and linked from the README.
 
 ## In progress
@@ -25,13 +26,13 @@ Last updated: 2026-10-17
 ## Planned
 
 - Finalize prediction-time feature availability and operational alert criteria before any real-world early-warning claims.
-- Add the React/Vite frontend and Docker deployment after reviewing the API milestone.
+- Add Docker deployment after reviewing the frontend milestone.
 
 ## Known issues
 
 - Prediction-time availability of the failure-mode indicators (`TWF`, `HDF`, `PWF`, `OSF`, `RNF`) has not been established; executed cross-tabs show direct overlap with the target for four indicators.
-- React/Vite frontend and Docker deployment code do not exist yet.
+- Docker deployment code does not exist yet.
 
 ## Next actionable milestone
 
-Review the FastAPI backend milestone; then decide whether to build the React/Vite client. Resolve prediction-time feature availability, alert horizon, and operational costs before making any real-world early-warning claims. Treat this only as synthetic-dataset machine-failure classification.
+Review the React frontend milestone; then prepare container deployment. Resolve prediction-time feature availability, alert horizon, and operational costs before making any real-world early-warning claims. Treat this only as synthetic-dataset machine-failure classification.

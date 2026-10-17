@@ -23,6 +23,11 @@ models/*.joblib
 models/*.pkl
 models/*.pickle
 
+# React/Vite frontend dependencies, builds, and local configuration
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+
 # Operating system files
 .DS_Store
 Thumbs.db

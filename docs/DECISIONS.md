@@ -101,3 +101,13 @@ Significant decisions are recorded here with their status. Proposed decisions ar
 - **Reasoning:** One lifespan load avoids repeated disk reads; existing inference remains the source of truth. Keeping the app alive without an artifact allows health diagnostics while returning HTTP 503 for prediction.
 - **Consequences:** The API process needs a locally generated trusted artifact and compatible Python/scikit-learn/joblib versions. This endpoint classifies synthetic-dataset records and is not a real-world early-warning service. `requirements.txt` now records notebook, ML, API, server, and HTTP test-client dependencies because no dependency manifest previously existed.
 - **Validation:** API tests cover valid inference, one-time loading, request validation, health/model-info, and missing-artifact behavior. No test-set evaluation or model selection was performed in this milestone.
+
+## D-011: Use a Vite React client with a development API proxy
+
+- **Status:** Accepted and implemented; frontend checks are run for this milestone.
+- **Context:** The FastAPI prediction service is available, and the project needs a browser interface for single-record classification and transparent display of previously documented evaluation results.
+- **Decision:** Create a TypeScript React dashboard in `frontend/`. Read the backend base URL from `VITE_API_BASE_URL`; in development, optionally proxy `/api` to `MAINTSENSE_API_PROXY_TARGET`. For direct cross-origin use, allow only explicitly configured origins through `MAINTSENSE_CORS_ORIGINS`.
+- **Alternatives considered:** Hardcode a backend URL into components; duplicate model scoring in JavaScript; add a frontend server or database; allow every origin for CORS.
+- **Reasoning:** A small typed HTTP client mirrors the Pydantic contract and keeps prediction logic in the backend. The Vite proxy provides same-origin local calls, while an explicit backend allow-list supports direct deployments without wildcard CORS.
+- **Consequences:** The browser requires the API and local model artifact to be available. Vite `VITE_*` values are public build-time configuration and must not contain secrets. Evaluation metrics are displayed from ML-004 documentation and are not recomputed by the client.
+- **Validation:** Six Vitest tests pass; ESLint and the TypeScript/Vite production build pass. The full Python suite passes 25 tests, including exact-origin CORS preflight coverage. No AI4I test-set evaluation or model/threshold changes were made for this milestone.

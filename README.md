@@ -20,8 +20,7 @@ results are not a validated real-world early-warning system.
 - Pandas and NumPy
 - Scikit-learn
 - FastAPI
-- React
-- JavaScript
+- React, Vite, and TypeScript
 - CSS
 - Docker
 
@@ -99,3 +98,33 @@ scope. A missing or unreadable artifact leaves health and model-info
 available; prediction requests then receive HTTP 503. Invalid requests
 receive HTTP 422. These endpoints classify records in a synthetic dataset;
 they are not validated real-world early-warning predictions.
+
+## React Dashboard
+
+The React + Vite + TypeScript dashboard lives under `frontend/`. Start the
+backend in one PowerShell terminal using the commands above. In a second
+terminal, from the repository root, install and run the frontend:
+
+```powershell
+Set-Location frontend
+npm ci
+$env:VITE_API_BASE_URL = "/api"
+$env:MAINTSENSE_API_PROXY_TARGET = "http://127.0.0.1:8000"
+npm run dev
+```
+
+Open the Vite URL printed in the terminal (normally port 5173). In development,
+Vite proxies `/api/health`, `/api/model-info`, and `/api/predict` to the backend
+and removes the `/api` prefix. This same-origin proxy avoids local browser CORS
+configuration. `VITE_API_BASE_URL` controls the API base in the frontend; for a
+direct backend URL, set it to the backend origin and leave the proxy target
+unset. For direct cross-origin access, the backend must allow the exact UI
+origin: set `MAINTSENSE_CORS_ORIGINS` in the backend terminal, for example to
+`http://localhost:5173`. For deployed use, set this to the specific trusted
+frontend origin or put both services behind a same-origin reverse proxy. The
+backend does not allow arbitrary origins by default.
+
+Frontend checks can be run from `frontend/` with `npm test`, `npm run lint`,
+and `npm run build`. Local `.env.local`, `node_modules`, build output, and test
+coverage are ignored by Git. Do not put secrets in Vite `VITE_*` variables;
+they are compiled into browser assets.
