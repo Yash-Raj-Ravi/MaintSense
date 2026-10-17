@@ -134,6 +134,8 @@ export default function App() {
   const [health, setHealth] = useState<HealthResponse | null>(null)
   const [modelInfo, setModelInfo] = useState<ModelInfoResponse | null>(null)
   const [overviewError, setOverviewError] = useState('')
+  const [statusCheck, setStatusCheck] = useState(0)
+  const [isCheckingStatus, setIsCheckingStatus] = useState(true)
   const [form, setForm] = useState<FormValues>(initialValues)
   const [formError, setFormError] = useState('')
   const [apiError, setApiError] = useState('')
@@ -142,21 +144,44 @@ export default function App() {
 
   useEffect(() => {
     let active = true
-    Promise.all([getHealth(), getModelInfo()])
+    setIsCheckingStatus(true)
+    Promise.allSettled([getHealth(), getModelInfo()])
       .then(([healthResult, infoResult]) => {
         if (!active) return
-        setHealth(healthResult)
-        setModelInfo(infoResult)
-        setConnection(healthResult.model_available ? 'online' : 'degraded')
-        if (!healthResult.model_available) setOverviewError('The API is responding, but its model artifact is unavailable.')
+        const healthResponse = healthResult.status === 'fulfilled' ? healthResult.value : null
+        const modelInfoResponse = infoResult.status === 'fulfilled' ? infoResult.value : null
+        setHealth(healthResponse)
+        setModelInfo(modelInfoResponse)
+
+        const hasApiResponse = healthResponse !== null || modelInfoResponse !== null
+        const modelUnavailable = [healthResponse?.model_available, modelInfoResponse?.model_available]
+          .some((available) => available === false)
+        setConnection(!hasApiResponse ? 'offline' : modelUnavailable ? 'degraded' : 'online')
+
+        const errors: string[] = []
+        if (modelUnavailable) {
+          errors.push('The API is responding, but its model artifact is unavailable.')
+        }
+        if (healthResult.status === 'rejected') {
+          const detail = healthResult.reason instanceof Error
+            ? healthResult.reason.message
+            : 'Could not load API health.'
+          errors.push(`Health check unavailable: ${detail}`)
+        }
+        if (infoResult.status === 'rejected') {
+          const detail = infoResult.reason instanceof Error
+            ? infoResult.reason.message
+            : 'Could not load model information.'
+          errors.push(`Model information unavailable: ${detail}`)
+        }
+        if (!hasApiResponse && errors.length === 0) errors.push('Could not load API status.')
+        setOverviewError(errors.join(' '))
       })
-      .catch((error: unknown) => {
-        if (!active) return
-        setConnection('offline')
-        setOverviewError(error instanceof Error ? error.message : 'Could not load API status.')
+      .finally(() => {
+        if (active) setIsCheckingStatus(false)
       })
     return () => { active = false }
-  }, [])
+  }, [statusCheck])
 
   function updateField<K extends keyof FormValues>(key: K, value: FormValues[K]) {
     setForm((current) => ({ ...current, [key]: value }))
@@ -224,7 +249,19 @@ export default function App() {
       <main className="main-content">
         <header className="topbar">
           <div className="breadcrumbs"><span>Workspace</span><b>/</b><strong>Overview</strong></div>
-          <div className="topbar-right"><StatusPill state={connection} /><span className="topbar-divider" /><span className="environment-label">LOCAL ENVIRONMENT</span></div>
+          <div className="topbar-right">
+            <StatusPill state={connection} />
+            <button
+              className="status-refresh"
+              type="button"
+              onClick={() => setStatusCheck((current) => current + 1)}
+              disabled={isCheckingStatus}
+              aria-label="Refresh API status"
+            >
+              <Icon name="refresh" size={15} />
+              {isCheckingStatus ? 'Checking' : 'Refresh status'}
+            </button>
+          </div>
         </header>
 
         <div className="page-content">
@@ -237,7 +274,7 @@ export default function App() {
             <article className="overview-card api-card">
               <div className="card-topline"><span className="card-icon"><Icon name="activity" /></span><span className={`tiny-status tiny-${connection}`} /></div>
               <p className="card-label">API CONNECTION</p><h2>{connection === 'online' ? 'Connected' : connection === 'checking' ? 'Checking…' : connection === 'degraded' ? 'Model unavailable' : 'Not connected'}</h2>
-              <p className="card-foot">{health?.status ?? (overviewError ? 'Check backend and URL settings' : 'Waiting for backend response')}</p>
+              <p className="card-foot">{health?.status ?? (modelInfo ? 'Model information endpoint responding' : overviewError ? 'Check backend and URL settings' : 'Waiting for backend response')}</p>
             </article>
             <article className="overview-card">
               <div className="card-topline"><span className="card-icon"><Icon name="chart" /></span><span className="card-kicker">CLASSIFIER</span></div>

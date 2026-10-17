@@ -59,6 +59,56 @@ describe('MaintSense dashboard', () => {
       'Tool wear [min]': 120,
     })
     expect(screen.getByText('52.0')).toBeInTheDocument()
+    expect(screen.queryByText('LOCAL ENVIRONMENT')).not.toBeInTheDocument()
+  })
+
+  it('keeps the API connected when health fails but model information succeeds', async () => {
+    vi.mocked(fetch)
+      .mockRejectedValueOnce(new TypeError('ERR_BLOCKED_BY_CLIENT'))
+      .mockResolvedValueOnce(response({
+        model_type: 'RandomForestClassifier',
+        threshold: 0.4,
+        required_features: ['Type'],
+        scope: 'Synthetic data',
+        model_available: true,
+      }))
+
+    render(<App />)
+
+    expect(await screen.findByText('API connected')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Connected' })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Health check unavailable: Unable to reach the prediction service.',
+    )
+    expect(screen.getByText('RandomForestClassifier')).toBeInTheDocument()
+  })
+
+  it('clears a partial-status error after a successful status refresh', async () => {
+    vi.mocked(fetch)
+      .mockRejectedValueOnce(new TypeError('ERR_BLOCKED_BY_CLIENT'))
+      .mockResolvedValueOnce(response({
+        model_type: 'RandomForestClassifier',
+        threshold: 0.4,
+        required_features: ['Type'],
+        scope: 'Synthetic data',
+        model_available: true,
+      }))
+      .mockResolvedValueOnce(response({ status: 'ok', model_available: true }))
+      .mockResolvedValueOnce(response({
+        model_type: 'RandomForestClassifier',
+        threshold: 0.4,
+        required_features: ['Type'],
+        scope: 'Synthetic data',
+        model_available: true,
+      }))
+
+    render(<App />)
+    expect(await screen.findByRole('status')).toHaveTextContent('Health check unavailable')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh API status' }))
+
+    await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument())
+    expect(screen.getByText('API connected')).toBeInTheDocument()
   })
 
   it('shows validation feedback for empty values without making an API call', async () => {
