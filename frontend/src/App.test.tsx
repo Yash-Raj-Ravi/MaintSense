@@ -2,11 +2,14 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 
-function response(body: unknown, status = 200): Response {
+function response(body: unknown, status = 200, contentType = 'application/json'): Response {
+  const bodyText = typeof body === 'string' ? body : JSON.stringify(body)
   return {
     ok: status >= 200 && status < 300,
     status,
+    headers: new Headers({ 'content-type': contentType }),
     json: vi.fn().mockResolvedValue(body),
+    text: vi.fn().mockResolvedValue(bodyText),
   } as unknown as Response
 }
 
@@ -66,5 +69,26 @@ describe('MaintSense dashboard', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Air temperature must be a finite number.')
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2))
+  })
+
+  it('shows a friendly connection message when the Vite proxy cannot reach FastAPI', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(response({ status: 'ok', model_available: true }))
+      .mockResolvedValueOnce(response({
+        model_type: 'RandomForestClassifier',
+        threshold: 0.4,
+        required_features: ['Type'],
+        scope: 'Synthetic data',
+        model_available: true,
+      }))
+      .mockResolvedValueOnce(response('', 500, 'text/plain'))
+
+    render(<App />)
+    await screen.findByText('API connected')
+    fireEvent.click(screen.getByRole('button', { name: /run assessment/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Unable to reach the prediction service. Check that the backend is running and try again.',
+    )
   })
 })

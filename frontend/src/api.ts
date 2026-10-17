@@ -48,6 +48,9 @@ export class NetworkError extends Error {
   }
 }
 
+const CONNECTION_ERROR_MESSAGE =
+  'Unable to reach the prediction service. Check that the backend is running and try again.'
+
 export function apiBaseUrl(): string {
   return (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/+$/, '')
 }
@@ -60,13 +63,28 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       headers: { Accept: 'application/json', ...init?.headers },
     })
   } catch {
-    throw new NetworkError('Could not reach the MaintSense API. Check the backend connection and URL configuration.')
+    throw new NetworkError(CONNECTION_ERROR_MESSAGE)
   }
 
   if (!response.ok) {
     let message = `API request failed (${response.status}).`
+    let bodyText = ''
     try {
-      const body: unknown = await response.json()
+      bodyText = await response.text()
+    } catch {
+      // Keep the status-based message if the response body cannot be read.
+    }
+
+    // Vite's dev proxy emits an empty text/plain 500 when its upstream is
+    // unreachable. A normal backend 500 has a response body, so it remains an
+    // ApiError instead of being mislabeled as a connectivity failure.
+    const contentType = response.headers.get('content-type')?.split(';', 1)[0].trim().toLowerCase()
+    if (response.status === 500 && contentType === 'text/plain' && bodyText.trim() === '') {
+      throw new NetworkError(CONNECTION_ERROR_MESSAGE)
+    }
+
+    try {
+      const body: unknown = JSON.parse(bodyText)
       if (typeof body === 'object' && body !== null && 'detail' in body) {
         const detail = (body as { detail: unknown }).detail
         if (typeof detail === 'string') message = detail
@@ -82,7 +100,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
         }
       }
     } catch {
-      // Keep the status-based message if the API response is not JSON.
+      // Keep the status-based message if the response is not JSON.
     }
     throw new ApiError(message, response.status)
   }

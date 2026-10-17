@@ -1,11 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { getHealth, getModelInfo, NetworkError, predict } from './api'
 
-function response(body: unknown, status = 200): Response {
+function response(
+  body: unknown,
+  status = 200,
+  contentType = 'application/json',
+): Response {
+  const bodyText = typeof body === 'string' ? body : JSON.stringify(body)
   return {
     ok: status >= 200 && status < 300,
     status,
+    headers: new Headers({ 'content-type': contentType }),
     json: vi.fn().mockResolvedValue(body),
+    text: vi.fn().mockResolvedValue(bodyText),
   } as unknown as Response
 }
 
@@ -53,13 +60,44 @@ describe('MaintSense API client', () => {
     }))
   })
 
-  it('surfaces API validation and availability errors', async () => {
+  it('preserves FastAPI validation errors', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(response({
+      detail: [{ msg: 'Field required' }],
+    }, 422))
+
+    await expect(getHealth()).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 422,
+      message: 'Field required',
+    })
+  })
+
+  it('preserves model-unavailable API errors', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(response({ detail: 'model unavailable' }, 503))
 
     await expect(getHealth()).rejects.toMatchObject({
       name: 'ApiError',
       status: 503,
       message: 'model unavailable',
+    })
+  })
+
+  it('classifies Vite empty text proxy failures as a friendly network error', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(response('', 500, 'text/plain'))
+
+    await expect(getHealth()).rejects.toMatchObject({
+      name: 'NetworkError',
+      message: 'Unable to reach the prediction service. Check that the backend is running and try again.',
+    })
+  })
+
+  it('keeps a genuine backend 500 as an HTTP API error', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(response('Internal Server Error', 500, 'text/plain'))
+
+    await expect(getHealth()).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 500,
+      message: 'API request failed (500).',
     })
   })
 
