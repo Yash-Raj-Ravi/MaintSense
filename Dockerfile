@@ -7,15 +7,26 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# Set by the local Compose environment or Render service configuration. The
+# URL points to a public, versioned GitHub Release asset; it is not a secret.
+ARG MODEL_ARTIFACT_URL
+
+COPY scripts/fetch_model_artifact.py ./scripts/fetch_model_artifact.py
+RUN if [ -z "$MODEL_ARTIFACT_URL" ]; then \
+      echo "Build failed: set MODEL_ARTIFACT_URL to the published GitHub Release asset URL." >&2; \
+      exit 1; \
+    fi && \
+    python scripts/fetch_model_artifact.py \
+      "$MODEL_ARTIFACT_URL" /app/models/random_forest.joblib
+
 COPY requirements-runtime.txt requirements.lock ./
 RUN python -m pip install --no-cache-dir --disable-pip-version-check \
     --requirement requirements-runtime.txt \
     --constraint requirements.lock
 
 COPY src/ ./src/
-COPY models/random_forest.joblib ./models/random_forest.joblib
 
-# Fail the image build if the provisioned training-only artifact is absent or invalid.
+# Fail the image build if the verified release artifact cannot be loaded.
 RUN python -c "from maintsense.inference import load_pipeline_artifact; load_pipeline_artifact()"
 
 EXPOSE 8000

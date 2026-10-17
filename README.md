@@ -130,21 +130,92 @@ and forwards `/api/*` to the `api` service, stripping the prefix. Vite
 `VITE_*` variables are embedded in public browser assets; do not put secrets
 in them.
 
-## Build and run with Docker Compose
+## Publish the existing model artifact for deployment
 
-First complete dataset provisioning and artifact generation above. The API
-image validates that the prebuilt artifact is present and loadable; it does
-not download the dataset or train during startup.
+The model and dataset are not committed. Deployment does not need the raw
+dataset and must not retrain the classifier. The backend image downloads the
+existing model from a versioned GitHub Release and verifies it against the
+repository-pinned SHA-256 before validating that the pipeline loads.
+
+The local artifact currently expected by this checkout is 4,872,018 bytes
+with SHA-256
+`d22f14131f57f2ac8feb534e0551c50936f0d9da7528f08abc81e79e70e545f3`.
+Before publishing it, verify your local file with:
 
 ```powershell
+Get-FileHash models/random_forest.joblib -Algorithm SHA256
+(Get-Item models/random_forest.joblib).Length
+```
+
+In GitHub, open the MaintSense repository's **Releases** page, draft a
+release using a tag you choose for this exact artifact version, upload the
+unchanged `models/random_forest.joblib` file, and publish the release. Do not
+regenerate or edit the model to create the asset. Copy the asset's HTTPS
+download URL; the build accepts only this repository's Release download URL
+and the pinned checksum prevents a different file from being used. No release
+or asset has been created by this project setup.
+
+## Deploy on Render
+
+Create two services from the same pushed repository:
+
+1. **Backend Web Service:** select Docker, use the repository root as the
+   root directory and `Dockerfile` as the Dockerfile path. Set
+   `MODEL_ARTIFACT_URL` to the exact public GitHub Release asset URL copied
+   above. Set `MAINTSENSE_CORS_ORIGINS` to the exact HTTPS origin of the
+   frontend Static Site. Do not set it to `*`. Set the Render health check
+   path to `/ready`; Render supplies `PORT`, which the server honors.
+2. **Frontend Static Site:** set root directory to `frontend`, build command
+   to `npm ci && npm run build`, and publish directory to `dist`. Set
+   `VITE_API_BASE_URL` to the backend's public HTTPS origin. This is public
+   browser configuration, not a secret.
+
+The release asset must be publicly downloadable because the Docker build
+fetches it without credentials. The SHA-256 is pinned in
+`scripts/fetch_model_artifact.py`; a missing URL, failed download, wrong file,
+or checksum mismatch stops the build. The verified artifact is placed at
+`/app/models/random_forest.joblib`, where the existing startup/readiness
+validation loads it. The dataset is not part of the image, and Docker build
+or API startup does not train a model.
+
+After these source changes are pushed and the release asset is published, test
+the build from a clean clone (replace the placeholder with the URL copied from
+the actual release):
+
+```powershell
+git clone https://github.com/Yash-Raj-Ravi/MaintSense.git MaintSense-clean-build
+Set-Location MaintSense-clean-build
+$env:MODEL_ARTIFACT_URL = "<exact public release asset download URL>"
+docker build --pull --no-cache `
+  --build-arg "MODEL_ARTIFACT_URL=$env:MODEL_ARTIFACT_URL" `
+  -t maintsense-api:clean .
+docker run --rm -d --name maintsense-api-check `
+  -e PORT=10000 -p 10000:10000 maintsense-api:clean
+Invoke-RestMethod http://127.0.0.1:10000/ready
+docker stop maintsense-api-check
+Remove-Item Env:MODEL_ARTIFACT_URL
+```
+
+Render Free web services use an ephemeral filesystem and spin down after
+inactivity. The model is included in the built image, so it remains available
+after a restart without a persistent disk; the backend may take time to wake
+before the first prediction request.
+
+## Build and run with Docker Compose
+
+After publishing the model asset, set its copied public URL in the shell and
+run Compose. The URL is not a credential; do not put tokens or secrets in it.
+
+```powershell
+$env:MODEL_ARTIFACT_URL = "<paste the exact GitHub Release asset download URL>"
 docker compose up --build
 ```
 
 Open `http://localhost:8080`. Compose waits for the API `/ready` health check
 before starting the Nginx frontend. Stop with `Ctrl+C`, then run
-`docker compose down`. For a direct cross-origin deployment, set
-`MAINTSENSE_CORS_ORIGINS` to the exact frontend origin and rebuild/recreate
-the service; wildcard origins are not enabled.
+`docker compose down`. Compose passes the URL as a required Docker build
+argument. The build helper verifies the SHA-256 and refuses to overwrite an
+existing destination artifact.
 
 ## Checks
 

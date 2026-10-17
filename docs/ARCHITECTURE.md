@@ -16,10 +16,18 @@ Official UCI AI4I ZIP
   -> frontend React/Vite dashboard
 
 Production containers:
+  versioned GitHub Release asset (existing model; not in Git)
+       -> Docker build downloads and verifies pinned SHA-256
+       -> /app/models/random_forest.joblib (inside API image)
+  Render backend Docker Web Service: python -m maintsense.server (PORT)
+       -> loaded joblib Pipeline
+  Render frontend Static Site: VITE_API_BASE_URL points to backend origin
+       -> FastAPI CORS allows only the configured static-site origin
+
+Local Docker Compose remains available:
   frontend image: Vite build with VITE_API_BASE_URL=/api
        -> Nginx serves SPA and strips /api from proxied requests
-       -> API image: python -m maintsense.server (PORT, no reload)
-            -> loaded joblib Pipeline
+       -> API image uses the same verified release asset
 ```
 
 `/health` is a diagnostic/liveness endpoint and reports model availability.
@@ -56,11 +64,20 @@ probability calibration, operating costs, and external validation are open.
 
 ## Deployment files
 
-- `Dockerfile`: API image; requires the generated artifact at build time and
-  validates that it can be loaded.
+- `Dockerfile`: API image; requires `MODEL_ARTIFACT_URL`, downloads only this
+  repository's GitHub Release asset, verifies the pinned digest, places it at
+  the expected artifact path, and validates that it loads.
+- `scripts/fetch_model_artifact.py`: checksum-pinned, HTTPS-only artifact
+  fetcher. It does not train a model or access the dataset.
 - `frontend/Dockerfile`: production static bundle and Nginx reverse proxy.
 - `compose.yaml`: connects the services and waits for API readiness.
 - `.dockerignore` and `frontend/.dockerignore`: omit local data, environments,
   dependencies, and generated build output from image contexts.
+
+For Render, deploy the backend Dockerfile as one Web Service and the React
+build as a separate Static Site. Configure the backend's artifact URL and
+exact frontend origin, and set the frontend's API base URL to the backend
+origin. The artifact is baked into the image, so the API does not depend on
+Render's ephemeral service filesystem after startup.
 
 Update this file when the implemented data flow or service topology changes.

@@ -136,10 +136,10 @@ Significant decisions are recorded here with their status. Proposed decisions ar
 
 - **Status:** Accepted; configuration and container image builds validated; live runtime smoke test pending.
 - **Context:** The API requires a generated joblib artifact, while the production frontend should call a same-origin API path.
-- **Decision:** Build an API image that copies and validates the pre-generated `models/random_forest.joblib`; build the frontend with `VITE_API_BASE_URL=/api` and serve static files with Nginx. Nginx forwards `/api/*` to FastAPI while stripping the prefix. Compose waits for API readiness before starting the frontend.
+- **Decision:** Build an API image containing the validated model artifact; build the frontend with `VITE_API_BASE_URL=/api` and serve static files with Nginx. Nginx forwards `/api/*` to FastAPI while stripping the prefix. Compose waits for API readiness before starting the frontend. Artifact delivery is now handled by D-016.
 - **Alternatives considered:** Train or download at API startup; expose separate public origins and require CORS; use Vite preview in production; combine Node build tools with the Python runtime image.
 - **Reasoning:** Missing artifacts fail early during image build, runtime performs no training or network data access, and same-origin routing avoids permissive CORS.
-- **Consequences:** Provision data and generate the artifact before Docker builds. The Vite value is compiled into browser assets, so changing it requires rebuilding the frontend image. Direct cross-origin deployment must configure exact trusted origins.
+- **Consequences:** The model artifact must be available to the Docker build through the versioned release workflow in D-016. The Vite value is compiled into browser assets, so changing it requires rebuilding the frontend image. Direct cross-origin deployment must configure exact trusted origins.
 - **Validation:** `docker compose config` and both Docker image builds passed in the prior deployment check. The Docker Engine is unavailable in the current review environment, so live container startup and end-to-end reverse-proxy checks remain pending. No model evaluation was performed.
 
 ## D-015: Separate pinned runtime and development dependencies
@@ -151,3 +151,13 @@ Significant decisions are recorded here with their status. Proposed decisions ar
 - **Reasoning:** This gives production a smaller install and constrains transitive resolution without adding a dependency-generation tool.
 - **Consequences:** Upgrades require regenerating and reviewing pins. The constraints snapshot includes environment packages beyond the runtime set and platform-specific entries; only requested dependencies are installed.
 - **Validation:** Pins were captured from `.venv`; the development requirements installed successfully, `python -m pytest --version` reported 9.1.1, `pip check` passed, and the complete Python suite passed (34 tests). Pip reports a pre-existing invalid `~ip` distribution warning in the local virtual environment. Runtime container dependency installation was validated during the prior successful image builds; the Docker Engine is unavailable in the current review environment.
+
+## D-016: Fetch the existing model artifact from a versioned release
+
+- **Status:** Accepted and implemented; actual release publication and clean Docker build remain pending.
+- **Context:** The fitted joblib artifact and raw dataset are intentionally excluded from Git, but a clean Render Docker build needs the existing pipeline at the path expected by inference.
+- **Decision:** Publish the unchanged `models/random_forest.joblib` as a manually created, versioned GitHub Release asset. Require its public HTTPS asset URL as `MODEL_ARTIFACT_URL` during Docker build and pin the measured SHA-256 and byte size in `scripts/fetch_model_artifact.py`. Verify the bytes before placing the file at `/app/models/random_forest.joblib`; retain the existing model-load validation.
+- **Alternatives considered:** Commit the model or dataset; regenerate the model during image build or startup; download without verifying the contents; require a mounted/persistent disk.
+- **Reasoning:** Release assets keep model binaries out of source history, checksum validation ensures the exact already-trained pipeline is used, and baking it into the image works with Render's ephemeral filesystem. No dataset, retraining, test evaluation, new secret, or new Python dependency is needed.
+- **Consequences:** A release asset must be published manually before building/deploying. Its download URL is public build configuration, not a credential. A changed artifact requires an intentional checksum/code review. The Docker build fails clearly if the URL is absent, outside the MaintSense release path, unreachable, or does not match the pinned size and digest.
+- **Validation:** The current local artifact measured 4,872,018 bytes with SHA-256 `d22f14131f57f2ac8feb534e0551c50936f0d9da7528f08abc81e79e70e545f3`. Unit tests cover accepted/invalid URLs, successful verified download, and checksum rejection. No release was created, no model was retrained, and no AI4I test partition was evaluated.

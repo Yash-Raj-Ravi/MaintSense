@@ -13,8 +13,6 @@ docs/
 tests/
 frontend/
 models/*
-!models/random_forest.joblib
 *.ipynb
 *.csv
 *.joblib
-!models/random_forest.joblib

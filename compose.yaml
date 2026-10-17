@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        MODEL_ARTIFACT_URL: ${MODEL_ARTIFACT_URL:?Set MODEL_ARTIFACT_URL to the published model GitHub Release asset URL}
     environment:
       PORT: "8000"
       MAINTSENSE_CORS_ORIGINS: ""
