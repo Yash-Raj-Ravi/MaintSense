@@ -56,3 +56,24 @@ Record only work that was actually run. No deep learning models have been traine
 
 - **Observations:** On this fixed validation split, Random Forest has the highest precision and average precision; Gradient Boosting has the highest recall and F1 among these five fixed-threshold candidates. Both tree candidates exceed the baselines on validation average precision, but this is a single validation comparison and does not establish real-world performance. The fixed threshold yields different false-alarm and missed-failure trade-offs. Accuracy alone remains insufficient given the 3.4% positive prevalence.
 - **Next steps:** Confirm prediction-time availability and define the operational lead time and costs for false alarms versus missed failures. Any further candidate selection or threshold work must remain on validation data; keep the test partition untouched until criteria are frozen.
+
+## ML-003: Validation-based probability threshold analysis
+
+- **Status:** Completed validation analysis; no threshold selected for deployment and no test evaluation performed.
+- **Objective:** Show how Random Forest and Gradient Boosting validation precision, recall, F1, false positives, and false negatives change over a fixed probability threshold grid.
+- **Dataset and protocol:** Same AI4I rows, feature set, stratified 60/20/20 split, and seed 42 as ML-001/ML-002. Both tree models are refit on the training partition and produce probabilities only for the 2,000-row validation partition. The validation set has 68 failures (3.4%).
+- **Threshold method:** Evaluate cutoffs from 0.05 through 0.95 in 0.05 increments, including 0.50. Scores greater than or equal to a cutoff predict failure. The values 0.25, 0.50, and 0.75 below are representative low/default/high cutoffs to make the trade-off legible; they are not a selected optimum. No threshold optimization or hyperparameter tuning was performed.
+- **Results:** Confusion matrix rows are actual `[0, 1]`, columns predicted `[0, 1]`.
+
+  | Model | Threshold | Precision | Recall | F1 | False positives | False negatives | Confusion matrix |
+  |---|---:|---:|---:|---:|---:|---:|---|
+  | Random Forest | 0.25 | 0.6098 | 0.7353 | 0.6667 | 32 | 18 | `[[1900, 32], [18, 50]]` |
+  | Random Forest | 0.50 | 0.9459 | 0.5147 | 0.6667 | 2 | 33 | `[[1930, 2], [33, 35]]` |
+  | Random Forest | 0.75 | 1.0000 | 0.1912 | 0.3210 | 0 | 55 | `[[1932, 0], [55, 13]]` |
+  | Gradient Boosting | 0.25 | 0.6267 | 0.6912 | 0.6573 | 28 | 21 | `[[1904, 28], [21, 47]]` |
+  | Gradient Boosting | 0.50 | 0.8235 | 0.6176 | 0.7059 | 9 | 26 | `[[1923, 9], [26, 42]]` |
+  | Gradient Boosting | 0.75 | 0.9630 | 0.3824 | 0.5474 | 1 | 42 | `[[1931, 1], [42, 26]]` |
+
+- **Precision-recall curves:** Generated from validation scores. The validation average precision is 0.7772 for Random Forest and 0.7457 for Gradient Boosting; the dashed reference is the 0.034 validation prevalence. See [validation precision-recall curve](figures/validation_pr_curve.png).
+- **Observations:** Lowering Random Forest's threshold from 0.50 to 0.25 raises recall from 0.5147 to 0.7353, while false positives rise from 2 to 32. For Gradient Boosting, lowering 0.50 to 0.25 raises recall from 0.6176 to 0.6912 and false positives from 9 to 28. At 0.75, both models reduce false positives further while missing more failures. These are validation trade-offs only. Probability calibration was not assessed, so scores should not be interpreted as calibrated failure risk. No cutoff is recommended absent a prediction horizon and operational costs for missed failures and false alerts.
+- **Next steps:** Establish the alert use case and the relative cost of missed failures versus false alarms, then agree on a decision rule using validation evidence. Keep the reserved test partition untouched until the model and decision criteria are fixed.

@@ -19,6 +19,14 @@ from maintsense.baseline import (  # noqa: E402
     split_dataset,
     validation_metrics,
 )
+from maintsense.threshold_analysis import (  # noqa: E402
+    SELECTED_THRESHOLDS,
+    THRESHOLDS,
+    evaluate_threshold,
+    evaluate_threshold_grid,
+    validation_precision_recall_data,
+    validation_probabilities,
+)
 
 
 def sample_frame(rows: int = 100) -> pd.DataFrame:
@@ -129,6 +137,42 @@ class BaselineTests(unittest.TestCase):
         self.assertIn("average_precision", metrics)
         self.assertIn("f1", metrics)
         self.assertIn("accuracy", metrics)
+
+    def test_threshold_metrics_use_inclusive_cutoff_and_count_errors(self):
+        metrics = evaluate_threshold(
+            pd.Series([0, 0, 1, 1]),
+            np.array([0.2, 0.5, 0.7, 0.9]),
+            threshold=0.5,
+        )
+
+        self.assertEqual(metrics["confusion_matrix"], [[1, 1], [0, 2]])
+        self.assertEqual(metrics["false_positives"], 1)
+        self.assertEqual(metrics["false_negatives"], 0)
+        self.assertEqual(metrics["precision"], 2 / 3)
+        self.assertEqual(metrics["recall"], 1.0)
+        self.assertEqual(metrics["f1"], 0.8)
+
+    def test_threshold_grid_includes_default_and_representative_cutoffs(self):
+        self.assertEqual(len(THRESHOLDS), 19)
+        self.assertIn(0.5, THRESHOLDS)
+        self.assertEqual(SELECTED_THRESHOLDS, (0.25, 0.5, 0.75))
+        results = evaluate_threshold_grid(
+            pd.Series([0, 1]),
+            np.array([0.4, 0.6]),
+        )
+        self.assertEqual(len(results), len(THRESHOLDS))
+
+    def test_tree_validation_probabilities_and_pr_curve_use_validation_rows(self):
+        splits = split_dataset(sample_frame())
+        probabilities = validation_probabilities(splits)
+
+        self.assertEqual(set(probabilities), {"random_forest", "gradient_boosting"})
+        for scores in probabilities.values():
+            self.assertEqual(len(scores), len(splits.y_validation))
+            self.assertTrue(np.all((scores >= 0) & (scores <= 1)))
+            curve = validation_precision_recall_data(splits.y_validation, scores)
+            self.assertGreaterEqual(curve["average_precision"], 0)
+            self.assertLessEqual(curve["average_precision"], 1)
 
 
 if __name__ == "__main__":

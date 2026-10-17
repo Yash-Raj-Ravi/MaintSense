@@ -14,6 +14,7 @@ Local AI4I CSV --------+
   |-- stratified 60/20/20 split (seed 42)
   |-- train-fitted category encoding and model-appropriate numeric handling
   |-- dummy, Logistic Regression, Random Forest, and Gradient Boosting comparison
+  |-- validation-only threshold analysis and precision-recall plot for tree models
   +-- final test partition held for later evaluation
 
 tests/test_baseline.py   baseline unit tests

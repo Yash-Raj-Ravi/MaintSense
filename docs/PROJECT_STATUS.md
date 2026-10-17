@@ -10,12 +10,13 @@ Last updated: 2026-10-17
 - The exploration notebook executed successfully with the project `.venv`; observed results are recorded in `EXPERIMENT_LOG.md`.
 - Reproducible baseline implemented in `src/maintsense/baseline.py`; four unit tests pass.
 - Dummy, two Logistic Regression variants, Random Forest, and Gradient Boosting evaluated on validation data. Results are recorded in `EXPERIMENT_LOG.md`.
-- Five unit tests pass, including model-comparison coverage.
+- Validation threshold analysis and precision-recall plot completed for Random Forest and Gradient Boosting; no operating threshold selected.
+- Eight unit tests pass, including model-comparison and threshold coverage.
 - Project documentation system established and linked from the README.
 
 ## In progress
 
-- Decide the operational prediction horizon and acceptable false-alarm versus missed-failure trade-off.
+- Decide the operational prediction horizon and acceptable false-alarm versus missed-failure trade-off before recommending a threshold.
 
 ## Planned
 

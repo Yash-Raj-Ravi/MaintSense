@@ -61,3 +61,13 @@ Significant decisions are recorded here with their status. Proposed decisions ar
 - **Reasoning:** The built-in estimators add no dependency, tree splits do not require numerical scaling, and the common validation protocol allows comparison without tuning to the held-out test set.
 - **Consequences:** Results are fixed-setting validation comparisons; they do not establish real-world performance or settle the operational threshold.
 - **Validation:** Both models fit and evaluate successfully; the new model-comparison test passes. Validation metrics are recorded in ML-002. Test partition remains unevaluated.
+
+## D-007: Analyze thresholds on validation probabilities only
+
+- **Status:** Accepted for analysis; no operating threshold selected.
+- **Context:** Default-threshold metrics show different trade-offs between missed failures and false alarms, and there is not yet an agreed operational cost or warning horizon.
+- **Decision:** Evaluate Random Forest and Gradient Boosting probabilities on the existing validation partition at cutoffs from 0.05 to 0.95 in 0.05 steps, including 0.50. Report representative cutoffs 0.25, 0.50, and 0.75 and a validation precision-recall curve. Classify probabilities equal to the threshold as positive.
+- **Alternatives considered:** Select the highest F1 threshold; tune a cutoff to the validation set; score the test set; report only the default 0.50 cutoff.
+- **Reasoning:** A fixed grid makes the precision/recall and false-alarm/missed-failure trade-off visible without claiming an optimum before operational costs are known. The untouched test set remains available for later confirmation.
+- **Consequences:** The analysis informs a future decision but does not recommend a production threshold. A single validation split may not reflect future machine populations or time periods.
+- **Validation:** Threshold functions and tests pass; validation metrics and plot are recorded in ML-003. Test set was not evaluated.
