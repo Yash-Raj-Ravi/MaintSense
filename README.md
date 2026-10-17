@@ -27,8 +27,9 @@ operational sensor measurements.
 
 ## Project Status
 
-Currently in the initial project setup and data exploration
-stage.
+Initial data exploration is complete, and the first traditional
+machine-learning validation baseline is implemented. See
+[project status](docs/PROJECT_STATUS.md) for the current milestone.
 
 ## Project Documentation
 
