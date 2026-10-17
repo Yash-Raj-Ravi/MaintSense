@@ -30,6 +30,13 @@ operational sensor measurements.
 Currently in the initial project setup and data exploration
 stage.
 
+## Project Documentation
+
+- [Project status](docs/PROJECT_STATUS.md)
+- [Technical decisions](docs/DECISIONS.md)
+- [Experiment log](docs/EXPERIMENT_LOG.md)
+- [Architecture](docs/ARCHITECTURE.md)
+
 ## Dataset
 
 This project uses the AI4I 2020 Predictive Maintenance Dataset

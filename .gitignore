@@ -16,6 +16,7 @@ __pycache__/
 
 # Raw datasets
 data/raw/*.csv
+data/raw/**/*.csv
 
 # Generated model artifacts
 models/*.joblib
