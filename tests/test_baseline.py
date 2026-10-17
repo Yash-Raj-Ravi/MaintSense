@@ -15,6 +15,7 @@ from maintsense.baseline import (  # noqa: E402
     NUMERICAL_FEATURES,
     TARGET,
     build_models,
+    evaluate_validation,
     split_dataset,
     validation_metrics,
 )
@@ -88,6 +89,33 @@ class BaselineTests(unittest.TestCase):
             )
         )
         self.assertEqual(transformed.shape[0], 1)
+
+    def test_all_five_candidates_run_on_validation_and_report_imbalance(self):
+        splits = split_dataset(sample_frame())
+        results = evaluate_validation(splits)
+
+        self.assertEqual(
+            set(results),
+            {
+                "dummy_most_frequent",
+                "logistic_regression",
+                "logistic_regression_balanced",
+                "random_forest",
+                "gradient_boosting",
+            },
+        )
+        for metrics in results.values():
+            self.assertEqual(metrics["positive_support"], 2)
+            self.assertAlmostEqual(metrics["positive_prevalence"], 0.1)
+            self.assertEqual(len(metrics["confusion_matrix"]), 2)
+            for metric in [
+                "precision",
+                "recall",
+                "f1",
+                "average_precision",
+                "accuracy",
+            ]:
+                self.assertIn(metric, metrics)
 
     def test_validation_metrics_include_required_values(self):
         metrics = validation_metrics(

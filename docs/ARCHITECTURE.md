@@ -12,8 +12,8 @@ Local AI4I CSV --------+
 (data/raw/, ignored)   |
                        +--> src/maintsense/baseline.py
   |-- stratified 60/20/20 split (seed 42)
-  |-- train-fitted encoding/scaling pipelines
-  |-- dummy and Logistic Regression validation comparison
+  |-- train-fitted category encoding and model-appropriate numeric handling
+  |-- dummy, Logistic Regression, Random Forest, and Gradient Boosting comparison
   +-- final test partition held for later evaluation
 
 tests/test_baseline.py   baseline unit tests

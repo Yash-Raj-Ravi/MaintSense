@@ -9,7 +9,8 @@ Last updated: 2026-10-17
 - `notebooks/01_data_exploration.ipynb` is authored. The AI4I CSV is present locally and excluded from Git.
 - The exploration notebook executed successfully with the project `.venv`; observed results are recorded in `EXPERIMENT_LOG.md`.
 - Reproducible baseline implemented in `src/maintsense/baseline.py`; four unit tests pass.
-- Dummy and two Logistic Regression variants evaluated on the validation partition. Results are recorded in `EXPERIMENT_LOG.md`.
+- Dummy, two Logistic Regression variants, Random Forest, and Gradient Boosting evaluated on validation data. Results are recorded in `EXPERIMENT_LOG.md`.
+- Five unit tests pass, including model-comparison coverage.
 - Project documentation system established and linked from the README.
 
 ## In progress
@@ -18,8 +19,8 @@ Last updated: 2026-10-17
 
 ## Planned
 
-- Finalize prediction-time feature availability and an operational alert threshold before any final test evaluation.
-- Compare the baseline against the frozen validation design; evaluate the final test set only after model and decision criteria are fixed.
+- Finalize prediction-time feature availability and operational alert criteria before any final test evaluation.
+- Evaluate the final test set only after model and decision criteria are fixed.
 - Add the FastAPI backend, React/Vite frontend, and Docker deployment only after the modeling workflow is established.
 
 ## Known issues

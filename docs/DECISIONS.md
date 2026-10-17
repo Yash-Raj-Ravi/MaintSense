@@ -51,3 +51,13 @@ Significant decisions are recorded here with their status. Proposed decisions ar
 - **Reasoning:** Stratification preserves the rare class in each partition, the held-out validation set supports an initial comparison, and the separate test partition remains available for a later unbiased check. No oversampling is needed for this baseline comparison.
 - **Consequences:** The split is a row-wise random split and may not represent temporal or machine-group generalization. The appropriate deployment split remains an open question.
 - **Validation:** Fixed-seed split and stratification tests pass; baseline execution produced 6,000/2,000/2,000 rows. The final test set was not evaluated.
+
+## D-006: Compare built-in tree ensembles without scaling
+
+- **Status:** Accepted for the initial comparison; settings are not tuned.
+- **Context:** The linear baseline needs comparison with nonlinear traditional ML candidates; scikit-learn is already installed.
+- **Decision:** Add `RandomForestClassifier` and `GradientBoostingClassifier` using the same selected inputs and split. One-hot encode `Type`, pass numerical features through without scaling, and fit preprocessing inside each pipeline on training rows only. Use fixed random seeds; configure the forest with `n_jobs=1` for reliable execution in the current Windows environment.
+- **Alternatives considered:** Install XGBoost/LightGBM; scale tree features; tune hyperparameters; oversample; inspect test results.
+- **Reasoning:** The built-in estimators add no dependency, tree splits do not require numerical scaling, and the common validation protocol allows comparison without tuning to the held-out test set.
+- **Consequences:** Results are fixed-setting validation comparisons; they do not establish real-world performance or settle the operational threshold.
+- **Validation:** Both models fit and evaluate successfully; the new model-comparison test passes. Validation metrics are recorded in ML-002. Test partition remains unevaluated.

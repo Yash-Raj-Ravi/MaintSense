@@ -8,6 +8,7 @@ from pathlib import Path
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.dummy import DummyClassifier
+from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     accuracy_score,
@@ -101,19 +102,35 @@ def split_dataset(
     )
 
 
-def make_preprocessor() -> ColumnTransformer:
-    """Build transformations that a model pipeline fits on training rows only."""
+def make_preprocessor(
+    *,
+    scale_numeric: bool = True,
+    dense_categorical: bool = False,
+) -> ColumnTransformer:
+    """Build training-fitted transformations for linear or tree estimators."""
     return ColumnTransformer(
         transformers=[
-            ("categorical", OneHotEncoder(handle_unknown="ignore"), CATEGORICAL_FEATURES),
-            ("numerical", StandardScaler(), NUMERICAL_FEATURES),
+            (
+                "categorical",
+                OneHotEncoder(
+                    handle_unknown="ignore",
+                    sparse_output=not dense_categorical,
+                ),
+                CATEGORICAL_FEATURES,
+            ),
+            (
+                "numerical",
+                StandardScaler() if scale_numeric else "passthrough",
+                NUMERICAL_FEATURES,
+            ),
         ],
         remainder="drop",
     )
 
 
 def build_models() -> dict[str, Pipeline]:
-    """Return a majority dummy and two Logistic Regression comparisons."""
+    """Return a dummy, two Logistic Regression, and two tree candidates."""
+    tree_preprocessor = make_preprocessor(scale_numeric=False, dense_categorical=True)
     return {
         "dummy_most_frequent": Pipeline(
             [("classifier", DummyClassifier(strategy="most_frequent"))]
@@ -137,6 +154,33 @@ def build_models() -> dict[str, Pipeline]:
                 ),
             ]
         ),
+        "random_forest": Pipeline(
+            [
+                ("preprocessor", tree_preprocessor),
+                (
+                    "classifier",
+                    RandomForestClassifier(
+                        n_estimators=200,
+                        random_state=RANDOM_STATE,
+                        n_jobs=1,
+                    ),
+                ),
+            ]
+        ),
+        "gradient_boosting": Pipeline(
+            [
+                ("preprocessor", make_preprocessor(scale_numeric=False, dense_categorical=True)),
+                (
+                    "classifier",
+                    GradientBoostingClassifier(
+                        n_estimators=100,
+                        learning_rate=0.1,
+                        max_depth=3,
+                        random_state=RANDOM_STATE,
+                    ),
+                ),
+            ]
+        ),
     }
 
 
@@ -148,6 +192,8 @@ def validation_metrics(
     """Calculate binary metrics at the estimator's default 0.5 threshold."""
     matrix = confusion_matrix(y_true, y_pred, labels=[0, 1])
     return {
+        "positive_support": int((y_true == 1).sum()),
+        "positive_prevalence": float((y_true == 1).mean()),
         "precision": float(precision_score(y_true, y_pred, zero_division=0)),
         "recall": float(recall_score(y_true, y_pred, zero_division=0)),
         "f1": float(f1_score(y_true, y_pred, zero_division=0)),

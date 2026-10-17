@@ -35,3 +35,24 @@ Record only work that was actually run. No deep learning models have been traine
 
 - **Observations:** Failures are only 3.4% of the validation rows. The dummy gets 96.6% accuracy by predicting no failures and misses all 68 failures. Unweighted Logistic Regression has higher accuracy (97.05%) but detects only 13/68 failures. Balanced Logistic Regression detects 56/68 but predicts 337 false positives, with lower precision and accuracy. The unweighted model has higher average precision here than the balanced variant. Thus accuracy alone obscures the recall/false-alarm trade-off; model usefulness depends on the acceptable operational cost and warning horizon. These are validation results, not final test performance or deployment evidence.
 - **Next steps:** Define the prediction horizon, false-alarm burden, and missed-failure cost. Confirm prediction-time availability of all selected inputs. Freeze model/threshold criteria before any final test evaluation; do not infer that class weighting is automatically superior.
+
+## ML-002: Tree model comparison on the existing validation split
+
+- **Status:** Completed validation comparison; the reserved test partition remains unevaluated.
+- **Objective:** Compare Random Forest and Gradient Boosting against the three existing baseline candidates under the same validation protocol.
+- **Dataset and split:** Same local AI4I dataset, selected features, stratified 60/20/20 split, and random state 42 as ML-001. Train/validation/test sizes remain 6,000/2,000/2,000. Only training and validation partitions were used for fitting and model comparison.
+- **Preprocessing:** Categorical `Type` one-hot encoded with unknown categories ignored; five numerical operating measurements passed through without scaling, which is unnecessary for tree splits. Preprocessing remains in each candidate pipeline and is fit on training rows only. Dense one-hot output is used for tree estimator compatibility. No oversampling.
+- **Features:** Unchanged from ML-001: `Type`, air temperature, process temperature, rotational speed, torque, and tool wear. Identifiers and failure-mode indicators remain excluded.
+- **Models and parameters:** All five candidates were rerun: most-frequent `DummyClassifier`; standard Logistic Regression (`max_iter=1000`, seed 42); balanced Logistic Regression (`class_weight="balanced"`); `RandomForestClassifier(n_estimators=200, random_state=42, n_jobs=1)`; and `GradientBoostingClassifier(n_estimators=100, learning_rate=0.1, max_depth=3, random_state=42)`. These are fixed comparison settings, not tuned hyperparameters. Classifiers use their default 0.5 prediction threshold; no threshold optimization was performed.
+- **Validation class balance:** 68/2,000 positives (3.4%) for every model. Confusion matrix rows are actual `[0, 1]`, columns predicted `[0, 1]`.
+
+  | Model | Precision | Recall | F1 | Average precision | Accuracy | Confusion matrix |
+  |---|---:|---:|---:|---:|---:|---|
+  | Most-frequent dummy | 0.0000 | 0.0000 | 0.0000 | 0.0340 | 0.9660 | `[[1932, 0], [68, 0]]` |
+  | Logistic Regression | 0.7647 | 0.1912 | 0.3059 | 0.4054 | 0.9705 | `[[1928, 4], [55, 13]]` |
+  | Logistic Regression, balanced | 0.1425 | 0.8235 | 0.2430 | 0.3680 | 0.8255 | `[[1595, 337], [12, 56]]` |
+  | Random Forest | 0.9459 | 0.5147 | 0.6667 | 0.7772 | 0.9825 | `[[1930, 2], [33, 35]]` |
+  | Gradient Boosting | 0.8235 | 0.6176 | 0.7059 | 0.7457 | 0.9825 | `[[1923, 9], [26, 42]]` |
+
+- **Observations:** On this fixed validation split, Random Forest has the highest precision and average precision; Gradient Boosting has the highest recall and F1 among these five fixed-threshold candidates. Both tree candidates exceed the baselines on validation average precision, but this is a single validation comparison and does not establish real-world performance. The fixed threshold yields different false-alarm and missed-failure trade-offs. Accuracy alone remains insufficient given the 3.4% positive prevalence.
+- **Next steps:** Confirm prediction-time availability and define the operational lead time and costs for false alarms versus missed failures. Any further candidate selection or threshold work must remain on validation data; keep the test partition untouched until criteria are frozen.
