@@ -1,8 +1,8 @@
 # MaintSense
 
-A machine learning-based predictive maintenance system
-that estimates industrial machine failure risk from
-operational sensor measurements.
+A traditional machine-learning project for machine-failure
+classification on the synthetic AI4I 2020 dataset. Its offline
+results are not a validated real-world early-warning system.
 
 ## Project Goals
 
@@ -27,8 +27,8 @@ operational sensor measurements.
 
 ## Project Status
 
-Initial data exploration is complete, and the first traditional
-machine-learning validation baseline is implemented. See
+Exploration, traditional model comparison, validation-based selection,
+and one final test evaluation are complete for the synthetic dataset. See
 [project status](docs/PROJECT_STATUS.md) for the current milestone.
 
 ## Project Documentation

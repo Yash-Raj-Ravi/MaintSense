@@ -71,3 +71,13 @@ Significant decisions are recorded here with their status. Proposed decisions ar
 - **Reasoning:** A fixed grid makes the precision/recall and false-alarm/missed-failure trade-off visible without claiming an optimum before operational costs are known. The untouched test set remains available for later confirmation.
 - **Consequences:** The analysis informs a future decision but does not recommend a production threshold. A single validation split may not reflect future machine populations or time periods.
 - **Validation:** Threshold functions and tests pass; validation metrics and plot are recorded in ML-003. Test set was not evaluated.
+
+## D-008: Freeze a validation-selected model and threshold
+
+- **Status:** Accepted, frozen, and evaluated once on the reserved test partition.
+- **Context:** ML-001 through ML-003 compared five fixed traditional classifiers and showed validation trade-offs across probability thresholds. The project has no agreed operational cost ratio or alert horizon.
+- **Decision:** Compare each of the five existing candidates at every fixed threshold from 0.05 to 0.95 using validation data only. Select the configuration with the highest validation F1; break ties by higher recall, fewer false positives, then the threshold nearest 0.50, with stable candidate/grid order as the final tie-break. This transparent benchmark rule selects Random Forest at 0.40. Freeze this choice before test evaluation.
+- **Alternatives considered:** Select on accuracy; select only among tree candidates; choose a threshold from assumed alert costs; optimize on the test set.
+- **Reasoning:** F1 balances precision and recall for the rare failure class, while the tie-breaks make missed failures and false alarms visible. The rule introduces no fabricated operational costs and keeps the test set out of selection.
+- **Consequences:** The choice is specific to this single synthetic dataset, fixed split, candidate set, and rule. It does not identify a universally optimal model or operating threshold. The selected pipeline was refit on training rows only and evaluated on the reserved test partition once.
+- **Validation:** The selection function compared all five candidates over all 19 grid values. Validation winner: Random Forest, threshold 0.40; precision 0.8824, recall 0.6618, F1 0.7563, 6 false positives, 23 false negatives, confusion matrix `[[1926, 6], [23, 45]]`, accuracy 0.9855, average precision 0.7772. The frozen configuration was then evaluated once on test: precision 0.8367, recall 0.6029, F1 0.7009, average precision 0.7817, accuracy 0.9825, 8 false positives, 27 false negatives, confusion matrix `[[1924, 8], [27, 41]]`. These test results did not trigger tuning or another evaluation.

@@ -11,7 +11,9 @@ Last updated: 2026-10-17
 - Reproducible baseline implemented in `src/maintsense/baseline.py`; four unit tests pass.
 - Dummy, two Logistic Regression variants, Random Forest, and Gradient Boosting evaluated on validation data. Results are recorded in `EXPERIMENT_LOG.md`.
 - Validation threshold analysis and precision-recall plot completed for Random Forest and Gradient Boosting; no operating threshold selected.
-- Eight unit tests pass, including model-comparison and threshold coverage.
+- Validation-based selection rule frozen; Random Forest at threshold 0.40 selected for one final test evaluation.
+- Frozen Random Forest configuration evaluated once on the reserved test partition; metrics are recorded in `EXPERIMENT_LOG.md`.
+- Ten unit tests pass, including model-comparison, threshold, and selection/evaluation coverage.
 - Project documentation system established and linked from the README.
 
 ## In progress
@@ -20,16 +22,14 @@ Last updated: 2026-10-17
 
 ## Planned
 
-- Finalize prediction-time feature availability and operational alert criteria before any final test evaluation.
-- Evaluate the final test set only after model and decision criteria are fixed.
+- Finalize prediction-time feature availability and operational alert criteria before any real-world early-warning claims.
 - Add the FastAPI backend, React/Vite frontend, and Docker deployment only after the modeling workflow is established.
 
 ## Known issues
 
 - Prediction-time availability of the failure-mode indicators (`TWF`, `HDF`, `PWF`, `OSF`, `RNF`) has not been established; executed cross-tabs show direct overlap with the target for four indicators.
 - No API, frontend, or deployment code exists yet.
-- Baseline implementation and documentation changes from this milestone are uncommitted; current branch is `main` at `abe817f`.
 
 ## Next actionable milestone
 
-Define the prediction horizon and the operational cost of missed failures versus false alarms. Keep the test partition sealed until model selection and alert criteria are fixed.
+Review the final test estimate and resolve prediction-time feature availability, alert horizon, and operational costs before making any real-world early-warning claims. Treat this only as synthetic-dataset machine-failure classification.

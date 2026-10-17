@@ -27,6 +27,10 @@ from maintsense.threshold_analysis import (  # noqa: E402
     validation_precision_recall_data,
     validation_probabilities,
 )
+from maintsense.model_selection import (  # noqa: E402
+    evaluate_selected_test,
+    select_validation_configuration,
+)
 
 
 def sample_frame(rows: int = 100) -> pd.DataFrame:
@@ -173,6 +177,55 @@ class BaselineTests(unittest.TestCase):
             curve = validation_precision_recall_data(splits.y_validation, scores)
             self.assertGreaterEqual(curve["average_precision"], 0)
             self.assertLessEqual(curve["average_precision"], 1)
+
+    def test_validation_selection_compares_all_candidates_and_fixed_grid(self):
+        splits = split_dataset(sample_frame())
+        result = select_validation_configuration(splits)
+
+        self.assertEqual(len(result["validation_results"]), 5 * len(THRESHOLDS))
+        selected = result["selected"]
+        self.assertIn(selected["model"], build_models())
+        self.assertIn(selected["threshold"], THRESHOLDS)
+        self.assertEqual(
+            selected,
+            max(
+                result["validation_results"],
+                key=lambda row: (
+                    row["f1"],
+                    row["recall"],
+                    -row["false_positives"],
+                    -abs(row["threshold"] - 0.50),
+                ),
+            ),
+        )
+
+    def test_selected_test_evaluator_returns_required_metrics(self):
+        splits = split_dataset(sample_frame())
+        result = evaluate_selected_test(
+            splits,
+            model_name="gradient_boosting",
+            threshold=0.5,
+        )
+
+        self.assertEqual(result["model"], "gradient_boosting")
+        self.assertEqual(result["threshold"], 0.5)
+        for metric in [
+            "precision",
+            "recall",
+            "f1",
+            "average_precision",
+            "accuracy",
+            "confusion_matrix",
+            "false_positives",
+            "false_negatives",
+        ]:
+            self.assertIn(metric, result)
+        self.assertEqual(
+            result["false_positives"], result["confusion_matrix"][0][1]
+        )
+        self.assertEqual(
+            result["false_negatives"], result["confusion_matrix"][1][0]
+        )
 
 
 if __name__ == "__main__":

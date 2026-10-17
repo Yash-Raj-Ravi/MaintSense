@@ -77,3 +77,23 @@ Record only work that was actually run. No deep learning models have been traine
 - **Precision-recall curves:** Generated from validation scores. The validation average precision is 0.7772 for Random Forest and 0.7457 for Gradient Boosting; the dashed reference is the 0.034 validation prevalence. See [validation precision-recall curve](figures/validation_pr_curve.png).
 - **Observations:** Lowering Random Forest's threshold from 0.50 to 0.25 raises recall from 0.5147 to 0.7353, while false positives rise from 2 to 32. For Gradient Boosting, lowering 0.50 to 0.25 raises recall from 0.6176 to 0.6912 and false positives from 9 to 28. At 0.75, both models reduce false positives further while missing more failures. These are validation trade-offs only. Probability calibration was not assessed, so scores should not be interpreted as calibrated failure risk. No cutoff is recommended absent a prediction horizon and operational costs for missed failures and false alerts.
 - **Next steps:** Establish the alert use case and the relative cost of missed failures versus false alarms, then agree on a decision rule using validation evidence. Keep the reserved test partition untouched until the model and decision criteria are fixed.
+
+## ML-004: Validation model selection and final test evaluation
+
+- **Status:** Completed; validation selection frozen and reserved test evaluated once.
+- **Objective:** Select one existing candidate and threshold using only validation results, then perform one final evaluation on the reserved test partition.
+- **Dataset and split:** Same local synthetic AI4I 2020 machine-failure classification dataset, leakage-safe features, stratified 60/20/20 split, and random state 42. Train/validation/test sizes are 6,000/2,000/2,000. Test results are not used for model or threshold tuning.
+- **Selection criterion:** Compare all five existing candidates over the already established 19 thresholds (0.05–0.95, step 0.05). Maximize validation F1; tie-break by higher recall, fewer false positives, then proximity to 0.50, followed by stable candidate/grid order. This is a transparent benchmark rule, not an operational cost model or claim of universal optimality.
+- **Validation comparison:** The best row per candidate under the same rule is shown below. Confusion matrices use actual `[0, 1]` rows and predicted `[0, 1]` columns.
+
+  | Candidate | Threshold | Precision | Recall | F1 | FP | FN | Accuracy | Average precision | Confusion matrix |
+  |---|---:|---:|---:|---:|---:|---:|---:|---:|---|
+  | Most-frequent dummy | 0.50 | 0.0000 | 0.0000 | 0.0000 | 0 | 68 | 0.9660 | 0.0340 | `[[1932, 0], [68, 0]]` |
+  | Logistic Regression | 0.20 | 0.4000 | 0.4412 | 0.4196 | 45 | 38 | 0.9585 | 0.4054 | `[[1887, 45], [38, 30]]` |
+  | Logistic Regression (balanced) | 0.75 | 0.2617 | 0.5735 | 0.3594 | 110 | 29 | 0.9305 | 0.3680 | `[[1822, 110], [29, 39]]` |
+  | Random Forest | 0.40 | 0.8824 | 0.6618 | 0.7563 | 6 | 23 | 0.9855 | 0.7772 | `[[1926, 6], [23, 45]]` |
+  | Gradient Boosting | 0.35 | 0.7759 | 0.6618 | 0.7143 | 13 | 23 | 0.9820 | 0.7457 | `[[1919, 13], [23, 45]]` |
+
+- **Frozen choice:** Random Forest at threshold 0.40, because it has the highest validation F1 across the five candidates and fixed grid. Gradient Boosting has the same validation recall at its own best row but lower F1 and more false positives. No operational costs were assumed.
+- **Final test results:** After the choice was frozen, Random Forest was fitted on the 6,000 training rows and evaluated once on the 2,000 reserved test rows. Precision 0.8367, recall 0.6029, F1 0.7009, average precision 0.7817, accuracy 0.9825, 8 false positives, and 27 false negatives. Confusion matrix (actual `[0, 1]` rows, predicted `[0, 1]` columns): `[[1924, 8], [27, 41]]`. The test results were recorded as a final estimate; no model or threshold changes followed.
+- **Limitations:** Threshold selection on one validation partition can overfit that partition. The test result is one estimate on this fixed random split and does not justify further tuning. AI4I is synthetic, and this is machine-failure classification, not a validated real-world early-warning system. Feature timing, prediction horizon, calibration, and deployment conditions remain unresolved.
